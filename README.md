@@ -187,9 +187,9 @@ RPS рассчитывается по формуле: RPS = (DAU × Действ
 | apps | Список приложений | app_id(8) + category_id(8) + owner_id(8) + title(40) + description(300) + file_path(255) + created_at(8) + updated_at(8) + version(50) = 687 б | 3.5 млн | 286 МБ |0.00002(из Steam) | 93 750 |
 | library | Библиотека приложений пользователя | id(8) + app_id(8) + author_id(8) = 24 Б | 7 * 2.5 млрд =  17.5 млрд | 48 Гб | 15 624 | 7 812 |
 | roles | Список ролей у юзера: модератор, разработчик, обычный пользователь | role_id(8) + title(30) + description(200) = 238 Б | 3 | 89 байт | 0 | 7 812 |
-| media | Медиафайлы | app_id(8) + media_id(8) + is_icon(2) + file_path(255) + size_bites(8) + created_at(8) = 289 Б | 3.5 млн * 5 =  17.5 млн | 602 МБ | | 468 750 |
+| media | Медиафайлы | app_id(8) + media_id(8) + is_icon(2) + file_path(255) + size_bites(8) + created_at(8) = 289 Б | 3.5 млн * 5 =  17.5 млн | 602 МБ | 93 750  | 468 750 |
 | reviews | Отзывы пользователей | review_id(8) + app_id(8) + review_text(400) + grade(8) + created_at(8) = 432 Б | 11 Млн | 721 МБ | 154 | 93 750 |
-|answers_reviews| Ответы на отзывы | id(8) + review_id(8) + answer_id(8) = 24 Б | 3 Млн | 9 МБ | 4 687 |
+|answers_reviews| Ответы на отзывы | id(8) + review_id(8) + answer_id(8) = 24 Б | 3 Млн | 9 МБ | 4 687 | 93 750 |
 
 ### Требования к консистентности:
 - Строгая консистентность: users, library, roles (Пользователиб, роли, библиотека должны быть строго согласованы); categories и categories_list(влюяют на навигацию) 
