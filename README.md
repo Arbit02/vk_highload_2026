@@ -196,7 +196,8 @@ RPS рассчитывается по формуле: RPS = (DAU × Действ
 - Событийная консистентность: apps, media, reviews, answers_reviews
 
 # Физическая схема БД
-<img width="1564" height="1617" alt="image" src="https://github.com/user-attachments/assets/4ae9c386-9e60-4ee7-b7ec-afa6209bdcdf" />
+<img width="1573" height="1621" alt="image" src="https://github.com/user-attachments/assets/15b65786-2771-4b2a-a1e1-3ca1f447853d" />
+
 
 
 
