@@ -295,6 +295,79 @@ RPS рассчитывается по формуле: RPS = (DAU × Действ
 ### Мониторинг
 Для сбора показателей используется Prometheus: он сам опрашивает каждый узел инфраструктуры и вытягивает с них метрики — загрузку процессора, объём оперативной памяти, число запросов в секунду (QPS) и время отклика (Latency). А графана (Grafana) отвечает за отображение этих данных в виде дашбордов и позволяет задавать пороговые значения для оповещения о нештатных ситуациях.
 
+# Схема проекта
+```mermaid
+graph TD
+
+%% ================= Глобальный уровень =================
+User((Пользователь)) --> Anycast[BGP Anycast + Geo DNS]
+
+Anycast --> DC1[DC1: Майами]
+Anycast --> DC2[DC2: Амстердам]
+Anycast --> DC3[DC3: Токио]
+Anycast --> DC4[DC4: Сидней]
+
+%% ================= Вход в ДЦ =================
+DC1 & DC2 & DC3 & DC4 --> L4[L4 Balancer: LVS]
+L4 --> L7[L7 Balancer: NGINX]
+L7 --> Gateway[API Gateway]
+Gateway --> Envoy[Envoy Proxy]
+
+%% ================= Микросервисы =================
+subgraph "Микросервисы"
+    AuthS[Auth Service]
+    AppS[App Service]
+    SearchS[Search Service]
+    ReviewS[Review Service]
+    LibraryS[Library Service]
+    MediaS[Media Service]
+end
+
+%% ================= Хранилища =================
+subgraph "Хранилища данных"
+    Redis[(Redis: Sessions)]
+    Postgres[(PostgreSQL: Users, Apps, Reviews)]
+    Cassandra[(Cassandra: Library)]
+    MinIO[(MinIO: APK + Media)]
+end
+
+%% ================= Потоки =================
+
+Envoy --> AuthS
+Envoy --> AppS
+Envoy --> SearchS
+Envoy --> ReviewS
+Envoy --> LibraryS
+Envoy --> MediaS
+
+%% Auth
+AuthS <--> |r/w| Redis
+AuthS <--> |r/w| Postgres
+
+%% Apps
+AppS <--> |r/w| Postgres
+AppS --> |upload| MinIO
+
+%% Reviews
+ReviewS <--> |r/w| Postgres
+
+%% Library
+LibraryS <--> |r/w| Cassandra
+
+%% Media
+MediaS --> |upload/download| MinIO
+
+%% Search (упрощенный, без ES)
+SearchS --> |query| Postgres
+
+%% Репликации и бэкапы
+Postgres --> |replication| PostgresReplica[(PostgreSQL Replica)]
+Postgres --> |backup| Backup[(Backup Storage)]
+
+%% CDN / Static
+User --> CDN[CDN]
+CDN --> MinIO
+```
 
 ## Источники
 1. https://play.google.com/store/games?hl=ru
