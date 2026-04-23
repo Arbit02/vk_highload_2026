@@ -308,7 +308,7 @@ Anycast --> DC3[DC3: Токио]
 Anycast --> DC4[DC4: Сидней]
 
 %% ================= Вход в ДЦ =================
-DC1 & DC2 & DC3 & DC4 --> L4[L4 Balancer: LVS]
+DC1 & DC2 & DC3 & DC4 --> L4[L4 Balancer: LVS + луудфдшмув]
 L4 --> L7[L7 Balancer: NGINX]
 L7 --> Gateway[API Gateway]
 Gateway --> Envoy[Envoy Proxy]
