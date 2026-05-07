@@ -360,6 +360,7 @@ MediaS --> |upload/download| MinIO
 %% Search (упрощенный, без ES)
 SearchS --> |query| Postgres
 
+
 %% Репликации и бэкапы
 Postgres --> |replication| PostgresReplica[(PostgreSQL Replica)]
 Postgres --> |backup| Backup[(Backup Storage)]
@@ -369,6 +370,59 @@ User --> CDN[CDN]
 CDN --> MinIO
 ```
 
+# Расчёт ресурсо
+Расчеты будут выполняться для наиболее загруженных дата-центров - Майами (DC1 + DC2), 35% суммарного трафика, Пиковы RPS = 207 865.  
+Разбивка пикового RPS по сервисам:
+- Auth Service - 207 865 RPS (Каждый входящий запрос проходит JWT-валидацию)
+- App Service - 93 750 RPS
+- Search Service - 41 573 RPS (брал 20%)
+- Review Service - 93 750 RPS (отзывы + ответы на отзывы)
+- Library Service - 15 624 RPS
+- Media Service - 468 750 RPS
+
+## Ресурсные требования
+| Характер Сервиса | RPS / ядро | RAM |
+|------------------|------------|-----|
+| Auth (JWT + Redis) | 3000 | 64 МБ |
+| App, Search (CRUD + PostgreSQL) | 3000 | 128 МБ |
+| Review (Crud + PostgreSQL) | 5000 | 64 МБ |
+| Library (Cassandra) | 4000 | 128 МБ |
+| Media (MinIO) | 4000 | 64 МБ |
+
+# Сводная таблица ресурсов
+| Сервис | Пиковая нагрузка (RPS) | Кол-во ядер | RAM | Net |
+|--------|-------------------|------------|------|----|
+| Auth | 207 865 | 70 | 4.5 ГБ | 1 Гбит/c |
+| App | 93 750 | 32 | 4 ГБ | 5 Гбит/c |
+| Search | 41 573 | 14 | 2 ГБ | 1 Гбит/c |
+| Review | 93 750 | 19 | 1.5 ГБ | 1 Гбит/c |
+| Library | 15 624 | 4 | 0.5 ГБ | 1 Гбит/c |
+| Media | 468 750 | 118 | 7.5 ГБ | 68 Гбит/c |
+| Итого | 921 562 | 257 | 20 ГБ | 77 Гбит/c |
+
+## Конфигурации серверов со стоимостью
+| Название | Хостинг | Конфигурация | Ядра | Колво |	Покупка	|
+|------|-----------|--------------|---------|--------|---------|---|
+| kubenode | own |2x EPYC 7713 512 ГБ | 64 | 28 | 16 500$ |
+| pg-master | own | EPYC 7282/256ГБ RAM | 16 | 12 | 10 000$ |
+| cassandra-node | own | EPYC 7282/256ГБ RAM | 32 | 12 | 13 000$ |
+| redis-node | own | Xeon Gold 6338/ 512 Гб RAM | 32 | 12 | 11 000$ |
+| minio - node | own | EPYC 7282 / 128 ГБ RAM | 16 | 24 | 15 000$ |
+
+
+Для сервисов в оркестрации:
+| название сервиса | Реплики | CPU req | CPU lim | RAM req | Rem lim | Назначение |
+|----|----|---|---|---|---|---|
+| Auth | 9 | 8 | 8 | 1 ГБ | 2 ГБ | Авторизация |
+| App | 4 | 8 | 8 | 2 ГБ | 4 ГБ | Витрина, страница приложения, CRUD |
+| Seacch | 2 | 7 | 8 | 2 ГБ | 4 ГБ | Полнотекстовый поиск |
+| Review | 3 | 7 | 8 | 1 ГБ | 2 ГБ | Отзывы и ответы на отзывы |
+| Library | 1 | 4 | 8 | 1 ГБ | 2 ГБ | Библиотека пользователя |
+| Media | 15| 8 | 8 | 1 ГБ | 2 ГБ | Раздача медиа |
+
+
+
+ 
 ## Источники
 1. https://play.google.com/store/games?hl=ru
 2. https://google.play/howplayworks/#:~:text=Global%20app%20distribution-,Connecting%20users%20and%20developers%20around%20the%20world,reach%20users%20in%20new%20ways.
