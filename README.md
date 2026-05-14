@@ -290,6 +290,8 @@ RPS рассчитывается по формуле: RPS = (DAU × Действ
 | Cassandra | Данные реплицируются на три узла, поэтому выход из строя любого из них не приведет к потере данных |
 | MinIO | Данные копируются или кодируются на трёх и более узлах, что гарантирует сохранность файлов при поломке диска |
 | Kubernetes | Автоматический рестарт упавших контейнеров |
+| Apache Kafka | Брокер сообщений | 
+
 
 - **Graceful Degradation**: о система остаётся работоспособной при локальных сбоях. Допустим, если отказывает поисковик — пользователи временно не могут искать контент, но возможность устанавливать приложения остается 
 - **Graceful Shutdown**: во время обновления программного обеспечения процессы и обработчики сначала перестают принимать новые запросы, затем доделывают текущий набор данных, и уже после этого происходит их остановка
@@ -316,10 +318,16 @@ Anycast --> DC3[DC3: Токио]
 Anycast --> DC4[DC4: Сидней]
 
 %% ================= Вход в ДЦ =================
-DC1 & DC2 & DC3 & DC4 --> L4[L4 Balancer: LVS + луудфдшмув]
+DC1 & DC2 & DC3 & DC4 --> L4[L4 Balancer: LVS + Keepalived]
 L4 --> L7[L7 Balancer: NGINX]
 L7 --> Gateway[API Gateway]
 Gateway --> Envoy[Envoy Proxy]
+
+%% ================= Kafka =================
+subgraph "Event Streaming"
+    Kafka[(Apache Kafka)]
+    Outbox[(Transactional Outbox)]
+end
 
 %% ================= Микросервисы =================
 subgraph "Микросервисы"
@@ -331,15 +339,39 @@ subgraph "Микросервисы"
     MediaS[Media Service]
 end
 
-%% ================= Хранилища =================
-subgraph "Хранилища данных"
-    Redis[(Redis: Sessions)]
-    Postgres[(PostgreSQL: Users, Apps, Reviews)]
-    Cassandra[(Cassandra: Library)]
-    MinIO[(MinIO: APK + Media)]
+%% ================= Async Workers =================
+subgraph "Async Workers"
+
+    SearchW[Search Indexer Worker]
+
+    StatsW[Statistics Worker]
+
+    RecoW[Recommendation Worker]
+
+    MediaW[Media Processing Worker]
+
 end
 
-%% ================= Потоки =================
+%% ================= Хранилища =================
+subgraph "Хранилища данных"
+
+    Redis[(Redis: Sessions + Cache)]
+
+    Postgres[(PostgreSQL: Write Side)]
+
+    PostgresReplica[(PostgreSQL Replica)]
+
+    Cassandra[(Cassandra: Read Models)]
+
+    OpenSearch[(OpenSearch: Search Read Model)]
+
+    MinIO[(MinIO: APK + Media)]
+
+    Backup[(Backup Storage)]
+
+end
+
+%% ================= Request Flow =================
 
 Envoy --> AuthS
 Envoy --> AppS
@@ -348,33 +380,70 @@ Envoy --> ReviewS
 Envoy --> LibraryS
 Envoy --> MediaS
 
-%% Auth
-AuthS <--> |r/w| Redis
-AuthS <--> |r/w| Postgres
+%% ================= Writes =================
 
-%% Apps
-AppS <--> |r/w| Postgres
-AppS --> |upload| MinIO
+AuthS <--> |write| Postgres
 
-%% Reviews
-ReviewS <--> |r/w| Postgres
+AppS <--> |write| Postgres
 
-%% Library
-LibraryS <--> |r/w| Cassandra
+ReviewS <--> |write| Postgres
 
-%% Media
+LibraryS <--> |write| Cassandra
+
+%% ================= Redis =================
+
+AuthS <--> Redis
+
+%% ================= Media =================
+
+AppS --> |upload APK| MinIO
+
 MediaS --> |upload/download| MinIO
 
-%% Search (упрощенный, без ES)
-SearchS --> |query| Postgres
+%% ================= Read Side =================
 
+SearchS --> |query| OpenSearch
 
-%% Репликации и бэкапы
-Postgres --> |replication| PostgresReplica[(PostgreSQL Replica)]
-Postgres --> |backup| Backup[(Backup Storage)]
+%% ================= Outbox Pattern =================
 
-%% CDN / Static
+Postgres --> Outbox
+
+Cassandra --> Outbox
+
+%% ================= Kafka =================
+
+Outbox --> Kafka
+
+%% ================= Kafka Consumers =================
+
+Kafka --> SearchW
+
+Kafka --> StatsW
+
+Kafka --> RecoW
+
+Kafka --> MediaW
+
+%% ================= Worker Actions =================
+
+SearchW --> OpenSearch
+
+StatsW --> Cassandra
+
+RecoW --> Redis
+
+MediaW --> MinIO
+
+%% ================= Репликации и бэкапы =================
+
+Postgres --> |replication| PostgresReplica
+
+Postgres --> |backup| Backup
+
+%% ================= CDN =================
+
 User --> CDN[CDN]
+
 CDN --> MinIO
 ```
 
